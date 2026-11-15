@@ -1,0 +1,46 @@
+# İstifadə:  cp .env.example .env  (dəyərləri doldurun)  →  docker compose up -d --build
+# İlk dəfə:  docker compose run --rm app seed
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kitabxana
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kitabxana}
+      POSTGRES_DB: kitabxana
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kitabxana"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://kitabxana:${POSTGRES_PASSWORD:-kitabxana}@db:5432/kitabxana
+      STORAGE_DIR: /app/storage
+    ports:
+      - "3000:3000"
+    volumes:
+      - storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: ["worker"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://kitabxana:${POSTGRES_PASSWORD:-kitabxana}@db:5432/kitabxana
+    depends_on:
+      app:
+        condition: service_started
+
+volumes:
+  pgdata:
+  storage:

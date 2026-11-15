@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+/* Qarabağ Universiteti brendbuku (Sentyabr 2024) — korporativ rənglər və şrift */
+@theme {
+  --color-brand-50: #f1f6f4;
+  --color-brand-100: #e1ece9;
+  --color-brand-200: #c3d8d3;
+  --color-brand-300: #9bbcb4;
+  --color-brand-400: #6f998f;
+  --color-brand-500: #44766c; /* əsas rəng */
+  --color-brand-600: #3b675e;
+  --color-brand-700: #30574f;
+  --color-brand-800: #234c45;
+  --color-brand-900: #16423c; /* köməkçi tünd yaşıl */
+  --color-ink: #231f20; /* əsas qara */
+  --color-cream: #f0f3bf; /* köməkçi açıq sarı */
+  --color-mint: #d3e8bf; /* köməkçi açıq yaşıl */
+  --color-sky: #caeaf1; /* köməkçi açıq mavi */
+  --color-danger: #b0463b;
+  --color-danger-soft: #f8e6e3;
+  --color-surface: #f5f8f7;
+  --font-sans: "Poppins", Tahoma, "Segoe UI", system-ui, sans-serif;
+  --shadow-card: 0 1px 2px rgb(22 66 60 / 0.06), 0 4px 16px rgb(22 66 60 / 0.06);
+  --shadow-lift: 0 2px 4px rgb(22 66 60 / 0.08), 0 12px 32px rgb(22 66 60 / 0.12);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+  body {
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-feature-settings: "ss01";
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  ::selection {
+    background: var(--color-cream);
+    color: var(--color-brand-900);
+  }
+}
+
+@layer components {
+  .field-input {
+    @apply w-full rounded-xl border border-brand-200 bg-white px-3.5 py-2.5 text-[15px] text-ink shadow-[inset_0_1px_2px_rgb(22_66_60/0.04)] transition placeholder:text-brand-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-100 focus:outline-none disabled:bg-brand-50 disabled:text-brand-400;
+  }
+  .card {
+    @apply rounded-2xl border border-brand-100 bg-white shadow-card;
+  }
+  .stripes {
+    background-image: repeating-linear-gradient(135deg, rgb(22 66 60 / 0.10) 0 6px, transparent 6px 12px);
+  }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+}
+
+@keyframes toast-in {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.animate-toast { animation: toast-in 0.25s ease-out; }
+
+@keyframes scan-line {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(calc(var(--scan-h, 240px) - 4px)); }
+}

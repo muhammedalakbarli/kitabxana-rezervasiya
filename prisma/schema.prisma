@@ -1,0 +1,444 @@
+// Qarabağ Universiteti Kitabxanası — Rezervasiya sistemi
+// Məlumat modeli: çox-kitabxanalı (gələcək binalar üçün), otaq + avadanlıq rezervasiyası,
+// QR ilə giriş təsdiqi, növbə (waitlist), dəvət sistemi, əlavə vaxt müraciətləri, bloklama.
+//
+// Portativlik: JSON sahələri String kimi saxlanılır, Postgres massivləri istifadə edilmir —
+// rəqəmsal şöbə istəsə provider-i "sqlserver" və ya "mysql"-ə dəyişə bilər.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  STAFF
+  ADMIN
+}
+
+enum UserType {
+  STUDENT
+  ACADEMIC
+  EMPLOYEE
+}
+
+enum ReservationStatus {
+  BOOKED // təsdiq (QR) gözlənilir
+  ACTIVE // ən azı bir iştirakçı QR ilə təsdiqləyib
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ParticipantRole {
+  OWNER
+  GUEST
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum WaitlistStatus {
+  WAITING
+  NOTIFIED
+  FULFILLED
+  EXPIRED
+  CANCELLED
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum EquipmentType {
+  LAPTOP
+  ADAPTER
+}
+
+enum EquipmentReservationStatus {
+  BOOKED
+  ISSUED
+  RETURNED
+  CANCELLED
+  NO_SHOW
+  OVERDUE
+}
+
+enum BlockReason {
+  NO_SHOW_LIMIT
+  EQUIPMENT_OVERDUE
+  EQUIPMENT_LATE
+  MANUAL
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  name               String?
+  role               Role      @default(STUDENT)
+  userType           UserType?
+  faculty            String?
+  specialty          String?
+  groupName          String?
+  course             Int?
+  department         String?
+  studentNumber      String?
+  phone              String?
+  profileCompletedAt DateTime?
+  /// Universitet kataloqu / Entra ID obyekt identifikatoru (inteqrasiya üçün)
+  externalId         String?   @unique
+  noShowStrikes      Int       @default(0)
+  blockedAt          DateTime?
+  blockedReason      String?
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  sessions              Session[]
+  ownedReservations     Reservation[]            @relation("ReservationOwner")
+  participations        ReservationParticipant[]
+  waitlist              WaitlistEntry[]
+  extensionRequests     ExtensionRequest[]       @relation("ExtensionRequester")
+  decidedRequests       ExtensionRequest[]       @relation("ExtensionDecider")
+  equipmentReservations EquipmentReservation[]   @relation("EquipmentUser")
+  blocks                UserBlock[]              @relation("BlockedUser")
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+
+  @@index([role])
+}
+
+model Session {
+  /// sha256(token) — xam token yalnız cookie-dədir
+  id        String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  ip        String?
+  userAgent String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model LoginCode {
+  id         String    @id @default(cuid())
+  email      String
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  ip         String?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, createdAt])
+}
+
+model Library {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  shortName   String
+  building    String
+  address     String?
+  description String?
+  /// Gün ərzində dəqiqə ilə (540 = 09:00)
+  openMinute  Int      @default(540)
+  closeMinute Int      @default(1080)
+  /// ISO həftə günləri, vergüllə (1 = B.e … 7 = Bazar)
+  workDays    String   @default("1,2,3,4,5")
+  coverPhoto  String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rooms      Room[]
+  equipment  Equipment[]
+  closedDays ClosedDay[]
+  waitlist   WaitlistEntry[]
+}
+
+model ClosedDay {
+  id        String   @id @default(cuid())
+  /// null = bütün kitabxanalar
+  libraryId String?
+  /// YYYY-MM-DD (Bakı vaxtı)
+  date      String
+  reason    String
+  createdAt DateTime @default(now())
+  library   Library? @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+
+  @@index([date])
+}
+
+model Room {
+  id          String   @id @default(cuid())
+  libraryId   String
+  slug        String
+  name        String
+  /// Qapı üzərindəki kod (məs. BO203)
+  code        String?
+  capacity    Int      @default(8)
+  description String?
+  /// Sətir-sətir siyahı (portativlik üçün String)
+  features    String   @default("")
+  qrToken     String   @unique
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  library      Library         @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  photos       RoomPhoto[]
+  reservations Reservation[]
+  waitlist     WaitlistEntry[] @relation("WaitlistRoom")
+  holds        WaitlistEntry[] @relation("WaitlistHoldRoom")
+
+  @@unique([libraryId, slug])
+}
+
+model RoomPhoto {
+  id        String   @id @default(cuid())
+  roomId    String
+  url       String
+  alt       String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+}
+
+model Reservation {
+  id              String            @id @default(cuid())
+  roomId          String
+  ownerId         String
+  startAt         DateTime
+  endAt           DateTime
+  /// Rezerv zamanı seçilmiş bitmə vaxtı (qısaltma/uzatma tarixçəsi üçün)
+  plannedEndAt    DateTime
+  /// 1, 2, 3 və ya 4 (= 4 və daha çox nəfər)
+  partyCategory   Int
+  headcount       Int?
+  purpose         String?
+  status          ReservationStatus @default(BOOKED)
+  /// QR pəncərəsi bağlandıqdan sonra müddət yenidən hesablandı
+  finalizedAt     DateTime?
+  cancelledAt     DateTime?
+  cancelReason    String?
+  completedAt     DateTime?
+  rulesAcceptedAt DateTime
+  icsSequence     Int               @default(0)
+  source          String            @default("web")
+  createdById     String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  room              Room                     @relation(fields: [roomId], references: [id])
+  owner             User                     @relation("ReservationOwner", fields: [ownerId], references: [id])
+  participants      ReservationParticipant[]
+  extensionRequests ExtensionRequest[]
+
+  @@index([roomId, startAt])
+  @@index([status, startAt])
+  @@index([ownerId, startAt])
+}
+
+model ReservationParticipant {
+  id            String          @id @default(cuid())
+  reservationId String
+  userId        String
+  role          ParticipantRole
+  inviteStatus  InviteStatus    @default(PENDING)
+  invitedAt     DateTime        @default(now())
+  respondedAt   DateTime?
+  checkedInAt   DateTime?
+  checkInMethod String?
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id])
+
+  @@unique([reservationId, userId])
+  @@index([userId])
+}
+
+model WaitlistEntry {
+  id                     String         @id @default(cuid())
+  userId                 String
+  libraryId              String
+  /// null = kitabxanadakı istənilən otaq
+  roomId                 String?
+  startAt                DateTime
+  endAt                  DateTime
+  status                 WaitlistStatus @default(WAITING)
+  /// Boşalan vaxt bu istifadəçi üçün qısa müddət saxlanılır
+  holdRoomId             String?
+  holdStartAt            DateTime?
+  holdEndAt              DateTime?
+  holdUntil              DateTime?
+  notifiedAt             DateTime?
+  fulfilledReservationId String?
+  createdAt              DateTime       @default(now())
+
+  user     User    @relation(fields: [userId], references: [id])
+  library  Library @relation(fields: [libraryId], references: [id])
+  room     Room?   @relation("WaitlistRoom", fields: [roomId], references: [id])
+  holdRoom Room?   @relation("WaitlistHoldRoom", fields: [holdRoomId], references: [id])
+
+  @@index([status, libraryId])
+  @@index([userId])
+}
+
+model ExtensionRequest {
+  id            String        @id @default(cuid())
+  reservationId String
+  requesterId   String
+  minutes       Int
+  reason        String
+  status        RequestStatus @default(PENDING)
+  decidedById   String?
+  decidedAt     DateTime?
+  adminNote     String?
+  createdAt     DateTime      @default(now())
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  requester   User        @relation("ExtensionRequester", fields: [requesterId], references: [id])
+  decidedBy   User?       @relation("ExtensionDecider", fields: [decidedById], references: [id])
+
+  @@index([status])
+}
+
+model Equipment {
+  id          String        @id @default(cuid())
+  libraryId   String
+  type        EquipmentType
+  /// Etiket nömrəsi (məs. NB-01)
+  assetTag    String        @unique
+  name        String
+  description String?
+  photoUrl    String?
+  qrToken     String        @unique
+  isActive    Boolean       @default(true)
+  sortOrder   Int           @default(0)
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  library      Library                @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  reservations EquipmentReservation[]
+}
+
+model EquipmentReservation {
+  id              String                     @id @default(cuid())
+  equipmentId     String
+  userId          String
+  startAt         DateTime
+  endAt           DateTime
+  plannedEndAt    DateTime
+  status          EquipmentReservationStatus @default(BOOKED)
+  extendedMinutes Int                        @default(0)
+  extendedAt      DateTime?
+  issuedAt        DateTime?
+  issuedById      String?
+  returnedAt      DateTime?
+  returnedById    String?
+  returnNote      String?
+  cancelledAt     DateTime?
+  cancelReason    String?
+  overdueAt       DateTime?
+  rulesAcceptedAt DateTime
+  icsSequence     Int                        @default(0)
+  source          String                     @default("web")
+  createdById     String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id])
+  user      User      @relation("EquipmentUser", fields: [userId], references: [id])
+
+  @@index([equipmentId, startAt])
+  @@index([status, endAt])
+  @@index([userId, startAt])
+}
+
+model UserBlock {
+  id          String      @id @default(cuid())
+  userId      String
+  reason      BlockReason
+  note        String?
+  createdById String?
+  createdAt   DateTime    @default(now())
+  liftedAt    DateTime?
+  liftedById  String?
+  liftNote    String?
+
+  user User @relation("BlockedUser", fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+model EmailLog {
+  id        String    @id @default(cuid())
+  to        String
+  subject   String
+  html      String
+  text      String?
+  /// iCalendar (Outlook/Google təqvim dəvəti)
+  ics       String?
+  icsMethod String?
+  /// PENDING → SENT | FAILED | LOGGED (MAIL_MODE=log)
+  status    String    @default("PENDING")
+  attempts  Int       @default(0)
+  error     String?
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([status, createdAt])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String?
+  /// JSON sətri
+  meta      String?
+  createdAt DateTime @default(now())
+  actor     User?    @relation(fields: [actorId], references: [id])
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+}
+
+model Setting {
+  key         String   @id
+  /// JSON sətri
+  value       String
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+}
