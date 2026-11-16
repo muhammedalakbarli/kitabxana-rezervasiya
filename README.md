@@ -99,6 +99,20 @@ Docker-siz də işləmək olar:
 
 ---
 
+## Vercel-də yerləşdirmə
+
+Layihə Vercel-də GitHub repo ilə əlaqələndirilib: `main` qoluna hər push avtomatik production deploy edir.
+
+- **Baza:** Vercel Marketplace üzərindən Prisma Postgres. `DATABASE_URL` avtomatik əlavə olunur.
+- **Build:** `vercel-build` skripti işləyir: `prisma generate` → `prisma migrate deploy` → baza boşdursa seed → `next build`.
+- **Lazım olan dəyişənlər:** `AUTH_SECRET`, `CRON_SECRET`, `APP_URL`, `ALLOWED_EMAIL_DOMAINS`, `ADMIN_EMAILS`, `MAIL_MODE`. Demo üçün əlavə olaraq `DEV_MAILBOX=true` və `DEV_MAILBOX_KEY` qoyulur: giriş kodları yalnız `/dev/poct?key=...` ünvanında görünür.
+- **Məhdudiyyətlər:**
+  - Hobby planında cron gündə bir dəfə işləyir. Fon tapşırıqları hər səhifə açılışında da işləyir. Dəqiqəlik dəqiqlik üçün xarici cron (məs. cron-job.org) `GET /api/cron` ünvanına `Authorization: Bearer <CRON_SECRET>` başlığı ilə hər dəqiqə sorğu göndərə bilər.
+  - Admin paneldən yüklənən fotolar Vercel-də müvəqqətidir (`/tmp`). Daimi saxlama üçün öz server (Docker) və ya Vercel Blob lazımdır.
+  - Real e-poçt göndərmək üçün SMTP dəyişənlərini əlavə edib `MAIL_MODE=smtp` qoyun.
+
+---
+
 ## Rəqəmsal şöbə üçün inteqrasiya təlimatı
 
 ### 1. Baza

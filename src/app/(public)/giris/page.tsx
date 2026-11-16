@@ -45,7 +45,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </>
         )}
         <div className={ms ? "" : "mt-6"}>
-          <LoginForm next={next} domain={env.allowedDomains[0] ?? "qu.edu.az"} devMailbox={env.mailMode === "log" && env.devMailbox} />
+          <LoginForm next={next} domain={env.allowedDomains[0] ?? "qu.edu.az"} devMailbox={env.mailMode === "log" && env.devMailbox && !env.devMailboxKey} />
         </div>
         <p className="mt-6 text-xs leading-relaxed text-brand-900/50">
           Daxil olmaqla Kitabxanadan istifadə qaydaları ilə tanış olduğunuzu təsdiq edirsiniz. Şəxsi məlumatlarınız yalnız rezervasiya məqsədilə istifadə olunur.

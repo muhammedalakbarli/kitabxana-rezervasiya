@@ -477,22 +477,3 @@ ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY
 
 -- AddForeignKey
 ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- ─────────────────────────────────────────────────────────────────────
--- Müdafiə qatı: eyni otaq/avadanlıq üçün üst-üstə düşən aktiv rezervasiyaları
--- baza səviyyəsində qadağan edir (tətbiq səviyyəsindəki yoxlamaya əlavə olaraq).
--- ─────────────────────────────────────────────────────────────────────
-CREATE EXTENSION IF NOT EXISTS btree_gist;
-
-ALTER TABLE "Reservation"
-  ADD CONSTRAINT "Reservation_no_overlap"
-  EXCLUDE USING gist ("roomId" WITH =, tsrange("startAt", "endAt", '[)') WITH &&)
-  WHERE ("status" IN ('BOOKED', 'ACTIVE'));
-
-ALTER TABLE "EquipmentReservation"
-  ADD CONSTRAINT "EquipmentReservation_no_overlap"
-  EXCLUDE USING gist ("equipmentId" WITH =, tsrange("startAt", "endAt", '[)') WITH &&)
-  WHERE ("status" IN ('BOOKED', 'ISSUED'));
-
-ALTER TABLE "Reservation" ADD CONSTRAINT "Reservation_time_order" CHECK ("endAt" > "startAt");
-ALTER TABLE "EquipmentReservation" ADD CONSTRAINT "EquipmentReservation_time_order" CHECK ("endAt" > "startAt");

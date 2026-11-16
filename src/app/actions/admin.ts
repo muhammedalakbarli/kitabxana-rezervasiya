@@ -291,7 +291,7 @@ const ALLOWED = new Map([["image/jpeg", "jpg"], ["image/png", "png"], ["image/we
 async function storeImage(file: File, folder: string): Promise<string> {
   const ext = ALLOWED.get(file.type);
   if (!ext) throw new Error("Yalnız JPG, PNG və ya WEBP şəkil yükləmək olar.");
-  if (file.size > 6 * 1024 * 1024) throw new Error("Şəklin ölçüsü 6 MB-dan çox olmamalıdır.");
+  if (file.size > 4 * 1024 * 1024) throw new Error("Şəklin ölçüsü 4 MB-dan çox olmamalıdır.");
   const buf = Buffer.from(await file.arrayBuffer());
   // Sadə məzmun yoxlaması (magic bytes)
   const isJpg = buf[0] === 0xff && buf[1] === 0xd8;

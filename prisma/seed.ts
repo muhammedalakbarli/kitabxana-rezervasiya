@@ -39,9 +39,14 @@ const libraries = [
 ];
 
 async function main() {
+  // --if-empty: baza artıq doludursa heç nə etmə (hər deploy-da təhlükəsiz işlədilə bilər)
+  if (process.argv.includes("--if-empty") && (await db.library.count()) > 0) {
+    console.log("Seed buraxıldı: baza artıq məlumat ehtiva edir.");
+    return;
+  }
   for (const lib of libraries) {
     const { rooms, ...data } = lib;
-    const l = await db.library.upsert({ where: { slug: lib.slug }, create: data, update: data });
+    const l = await db.library.upsert({ where: { slug: lib.slug }, create: data, update: {} });
     for (const [i, r] of rooms.entries()) {
       const room = await db.room.upsert({
         where: { libraryId_slug: { libraryId: l.id, slug: r.slug } },
@@ -56,7 +61,7 @@ async function main() {
           description: "Fərdi və qrup şəklində öyrənmə, akademik müzakirələr və onlayn dərslər üçün sakit otaq.",
           features: ["Dəyirmi iş masası", "Maksimum 8 nəfər", "Saxlama şkafı", "Wi-Fi"].join("\n"),
         },
-        update: { name: r.name, code: r.code, sortOrder: i + 1 },
+        update: {},
       });
       const existing = await db.roomPhoto.count({ where: { roomId: room.id } });
       if (!existing) {

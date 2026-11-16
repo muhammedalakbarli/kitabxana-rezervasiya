@@ -8,9 +8,11 @@ export const metadata: Metadata = { title: "Test poçt qutusu", robots: { index:
 export const dynamic = "force-dynamic";
 
 /** YALNIZ inkişaf/test üçün: MAIL_MODE=log və DEV_MAILBOX=true olduqda göndərilən məktubları göstərir. */
-export default async function DevMailbox({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
+export default async function DevMailbox({ searchParams }: { searchParams: Promise<{ id?: string; key?: string }> }) {
   if (!(env.devMailbox && env.mailMode === "log")) notFound();
   const sp = await searchParams;
+  if (env.devMailboxKey && sp.key !== env.devMailboxKey) notFound();
+  const k = env.devMailboxKey ? `&key=${encodeURIComponent(env.devMailboxKey)}` : "";
   const list = await db.emailLog.findMany({ orderBy: { createdAt: "desc" }, take: 40, select: { id: true, to: true, subject: true, createdAt: true, icsMethod: true } });
   const current = sp.id ? await db.emailLog.findUnique({ where: { id: sp.id } }) : list[0] ? await db.emailLog.findUnique({ where: { id: list[0].id } }) : null;
   return (
@@ -20,7 +22,7 @@ export default async function DevMailbox({ searchParams }: { searchParams: Promi
         <ul className="max-h-[calc(100dvh-48px)] overflow-y-auto">
           {list.map((m) => (
             <li key={m.id}>
-              <a href={`/dev/poct?id=${m.id}`} className={`block border-b border-brand-100 px-4 py-3 text-sm hover:bg-white ${current?.id === m.id ? "bg-white" : ""}`}>
+              <a href={`/dev/poct?id=${m.id}${k}`} className={`block border-b border-brand-100 px-4 py-3 text-sm hover:bg-white ${current?.id === m.id ? "bg-white" : ""}`}>
                 <div className="truncate font-medium text-brand-900">{m.subject}</div>
                 <div className="truncate text-xs text-brand-900/55">{m.to} · {fmtDateTime(m.createdAt)}{m.icsMethod ? ` · 📅 ${m.icsMethod}` : ""}</div>
               </a>

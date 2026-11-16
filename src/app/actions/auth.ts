@@ -19,7 +19,9 @@ export async function loginAction(prev: LoginState, form: FormData): Promise<Log
     return {
       step: "code",
       email: res.email,
-      info: env.mailMode === "log" && env.devMailbox ? "Test rejimi: kod /dev/poct səhifəsində görünür." : `Kod ${res.email} ünvanına göndərildi.`,
+      info: env.mailMode === "log" && env.devMailbox
+        ? env.devMailboxKey ? "Test rejimi: kodu sistem administratorundan alın." : "Test rejimi: kod /dev/poct səhifəsində görünür."
+        : `Kod ${res.email} ünvanına göndərildi.`,
     };
   }
 

@@ -18,7 +18,9 @@
     "db:studio": "prisma studio",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:integration": "DATABASE_URL=${TEST_DATABASE_URL:-postgresql://kitabxana@localhost:5434/kitabxana_test} prisma migrate deploy && vitest run --config vitest.integration.mts"
+    "test:integration": "DATABASE_URL=${TEST_DATABASE_URL:-postgresql://kitabxana@localhost:5434/kitabxana_test} prisma migrate deploy && vitest run --config vitest.integration.mts",
+    "postinstall": "prisma generate",
+    "vercel-build": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts --if-empty && next build"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -48,5 +50,8 @@
     "tsx": "^4.23.15",
     "typescript": "5.9",
     "vitest": "^5.1.0"
+  },
+  "engines": {
+    "node": "22.x"
   }
 }

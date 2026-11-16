@@ -7,7 +7,8 @@ export const env = {
   allowedDomains: list(process.env.ALLOWED_EMAIL_DOMAINS ?? "qu.edu.az"),
   adminEmails: list(process.env.ADMIN_EMAILS),
   cronSecret: process.env.CRON_SECRET ?? "",
-  storageDir: process.env.STORAGE_DIR ?? "./storage",
+  // Vercel-də yalnız /tmp yazıla biləndir (müvəqqəti)
+  storageDir: process.env.STORAGE_DIR ?? (process.env.VERCEL ? "/tmp/storage" : "./storage"),
   mailMode: (process.env.MAIL_MODE ?? "log") as "smtp" | "log",
   smtp: {
     host: process.env.SMTP_HOST ?? "",
@@ -17,6 +18,8 @@ export const env = {
   },
   mailFrom: process.env.MAIL_FROM ?? "QU Kitabxana <kitabxana@qu.edu.az>",
   devMailbox: process.env.DEV_MAILBOX === "true",
+  /** Təyin olunubsa /dev/poct yalnız ?key=... ilə açılır (ictimai demo üçün) */
+  devMailboxKey: process.env.DEV_MAILBOX_KEY ?? "",
   ms: {
     tenantId: process.env.MS_TENANT_ID ?? "",
     clientId: process.env.MS_CLIENT_ID ?? "",
