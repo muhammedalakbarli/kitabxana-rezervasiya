@@ -18,13 +18,14 @@ async function qrSvg(token: string) {
 }
 
 export default async function QrPage({ searchParams }: { searchParams: Promise<{ kitabxana?: string; nov?: string }> }) {
-  const user = await requireStaff();
+  const ctx = await requireStaff();
   const sp = await searchParams;
+  const scopeLib = ctx.libraryId ?? (sp.kitabxana || null);
   const rules = await getRules();
   const libraries = await db.library.findMany({
-    where: sp.kitabxana ? { id: sp.kitabxana } : { isActive: true },
+    where: scopeLib ? { id: scopeLib } : { isActive: true, archivedAt: null },
     orderBy: { sortOrder: "asc" },
-    include: { rooms: { where: { isActive: true }, orderBy: { sortOrder: "asc" } }, equipment: { where: { isActive: true }, orderBy: [{ type: "asc" }, { sortOrder: "asc" }] } },
+    include: { rooms: { where: { isActive: true, archivedAt: null }, orderBy: { sortOrder: "asc" } }, equipment: { where: { isActive: true, archivedAt: null }, orderBy: [{ type: "asc" }, { sortOrder: "asc" }] } },
   });
   const showEq = sp.nov === "avadanliq";
   const cards = await Promise.all(
@@ -34,7 +35,7 @@ export default async function QrPage({ searchParams }: { searchParams: Promise<{
       ).map(async (c) => ({ ...c, svg: await qrSvg(c.token) })),
     ),
   );
-  const allLibs = await db.library.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } });
+  const allLibs = ctx.libraryId ? [] : await db.library.findMany({ where: { archivedAt: null }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } });
 
   return (
     <div>
@@ -46,7 +47,7 @@ export default async function QrPage({ searchParams }: { searchParams: Promise<{
         />
         <Card className="mb-6 p-4">
           <form className="flex flex-wrap gap-3">
-            <select name="kitabxana" defaultValue={sp.kitabxana ?? ""} className="field-input w-auto"><option value="">Bütün kitabxanalar</option>{allLibs.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
+            {!ctx.libraryId && <select name="kitabxana" defaultValue={sp.kitabxana ?? ""} className="field-input w-auto"><option value="">Bütün kitabxanalar</option>{allLibs.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select>}
             <select name="nov" defaultValue={sp.nov ?? ""} className="field-input w-auto"><option value="">Otaqlar</option><option value="avadanliq">Avadanlıq etiketləri</option></select>
             <button className={btn("secondary")}>Göstər</button>
           </form>
@@ -66,7 +67,7 @@ export default async function QrPage({ searchParams }: { searchParams: Promise<{
               <div className="mt-2 text-xs text-brand-900/55">Kamera ilə skan edin və ya kodu daxil edin:</div>
               <div className="mt-1 inline-block rounded-lg bg-cream px-3 py-1 font-mono text-lg font-bold tracking-[0.25em] text-brand-900">{c.token}</div>
               {c.kind === "room" && <p className="mt-3 text-xs leading-relaxed text-brand-900/70">Rezervasiyanın başlanğıcından {rules.checkInAfterMinutes} dəqiqə ərzində skan edin. Qrup üzvlərinin hər biri skan etməlidir.</p>}
-              {user.role === "ADMIN" && (
+              {ctx.superAdmin && (
                 <form action={rotateQrAction} className="no-print mt-4">
                   <input type="hidden" name="kind" value={c.kind} />
                   <input type="hidden" name="id" value={c.id} />

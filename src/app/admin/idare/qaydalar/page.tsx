@@ -4,31 +4,30 @@ import { addClosedDayAction, removeClosedDayAction } from "@/app/actions/admin";
 import { RulesForm } from "@/components/rules-form";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, PageHeader, SectionTitle } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { requireSuperAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env, microsoftEnabled } from "@/lib/env";
 import { getRules } from "@/lib/settings";
 import { dayKey, fmtDay } from "@/lib/time";
 
-export const metadata: Metadata = { title: "Qaydalar və parametrlər" };
+export const metadata: Metadata = { title: "Qaydalar və bayramlar" };
 
-export default async function SettingsPage() {
-  await requireAdmin();
+export default async function RulesPage() {
+  await requireSuperAdmin();
   const [rules, closed, libraries] = await Promise.all([
     getRules(),
     db.closedDay.findMany({ where: { date: { gte: dayKey(new Date()) } }, orderBy: { date: "asc" }, include: { library: true } }),
-    db.library.findMany({ orderBy: { sortOrder: "asc" } }),
+    db.library.findMany({ where: { archivedAt: null }, orderBy: { sortOrder: "asc" } }),
   ]);
   const integrations: [string, boolean, string][] = [
-    ["E-poçt göndərmə (SMTP)", env.mailMode === "smtp", env.mailMode === "smtp" ? `${env.smtp.host}:${env.smtp.port}` : "Test rejimi — məktublar yalnız jurnala yazılır"],
+    ["E-poçt göndərmə (SMTP)", env.mailMode === "smtp", env.mailMode === "smtp" ? `${env.smtp.host}:${env.smtp.port} — qeydiyyat və şifrə bərpası e-poçt kodu ilə təsdiqlənir` : "Test rejimi — məktublar yalnız jurnala yazılır, şifrə bərpası admin vasitəsilə"],
     ["Microsoft 365 ilə giriş (Entra ID)", microsoftEnabled(), microsoftEnabled() ? "Aktiv" : "MS_TENANT_ID / MS_CLIENT_ID / MS_CLIENT_SECRET təyin edilməyib"],
     ["QR təsdiqi üçün şəbəkə məhdudiyyəti", env.checkinCidrs.length > 0, env.checkinCidrs.length ? env.checkinCidrs.join(", ") : "Söndürülüb — istənilən şəbəkədən təsdiq mümkündür"],
   ];
   return (
     <div className="space-y-8">
-      <PageHeader title="Qaydalar və parametrlər" subtitle="Dəyişikliklər dərhal bütün kitabxanalara tətbiq olunur. Mövcud rezervasiyaların müddəti dəyişmir." />
+      <PageHeader eyebrow="İdarəetmə" title="Qaydalar və bayramlar" subtitle="Qaydalar bütün kitabxanalara tətbiq olunur və dərhal qüvvəyə minir. İş saatları hər kitabxana üçün “Fakültə və kitabxanalar” bölməsində tənzimlənir." />
       <Card className="p-5 sm:p-6"><RulesForm rules={rules} /></Card>
-
       <Card className="p-5 sm:p-6">
         <SectionTitle><span className="inline-flex items-center gap-2"><CalendarOff className="size-5 text-brand-500" /> Qeyri-iş günləri (bayramlar)</span></SectionTitle>
         <form action={addClosedDayAction} className="mb-4 grid gap-2 sm:grid-cols-[160px_1fr_1fr_auto]">
@@ -48,7 +47,6 @@ export default async function SettingsPage() {
           </ul>
         )}
       </Card>
-
       <Card className="p-5 sm:p-6">
         <SectionTitle>İnteqrasiyalar</SectionTitle>
         <ul className="divide-y divide-brand-100">
@@ -59,7 +57,6 @@ export default async function SettingsPage() {
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-xs text-brand-900/55">Bu parametrlər server mühit dəyişənləri (.env) ilə idarə olunur — rəqəmsal şöbə tərəfindən təyin edilir. Ətraflı: README.md → “İnteqrasiya”.</p>
       </Card>
     </div>
   );

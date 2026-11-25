@@ -39,7 +39,7 @@ export const WAITLIST_STATUS: Record<WaitlistStatus, { label: string; tone: Tone
   CANCELLED: { label: "Ləğv edildi", tone: "neutral" },
 };
 
-export const ROLE_LABELS: Record<Role, string> = { STUDENT: "İstifadəçi", STAFF: "Kitabxana əməkdaşı", ADMIN: "Administrator" };
+export const ROLE_LABELS: Record<Role, string> = { STUDENT: "Tələbə", SUPERVISOR: "Admin (supervayzer)", SUPERADMIN: "Super admin" };
 export const USER_TYPE_LABELS: Record<UserType, string> = { STUDENT: "Tələbə", ACADEMIC: "Akademik heyət", EMPLOYEE: "Əməkdaş" };
 
 /** Audit jurnalı əməliyyatlarının oxunaqlı adları */
@@ -48,6 +48,22 @@ export const AUDIT_LABELS: Record<string, string> = {
   "profile.completed": "Profil tamamlandı",
   "profile.updated": "Profil yeniləndi",
   "auth.microsoft": "Microsoft ilə giriş",
+  "auth.login": "Sistemə giriş",
+  "auth.password_reset": "Şifrə bərpa edildi",
+  "auth.password_changed": "Şifrə dəyişdirildi",
+  "admin.password_reset": "Admin şifrəni sıfırladı",
+  "admin.supervisor": "Supervayzer təyin edildi",
+  "faculty.created": "Fakültə əlavə edildi",
+  "faculty.updated": "Fakültə yeniləndi",
+  "faculty.deleted": "Fakültə silindi",
+  "library.hours": "İş saatları dəyişdirildi",
+  "library.archived": "Kitabxana arxivləndi",
+  "room.maintenance": "Otaq təmir statusu",
+  "room.archived": "Otaq silindi",
+  "equipment.maintenance": "Avadanlıq təmir statusu",
+  "equipment.archived": "Avadanlıq silindi",
+  "report.exported": "Hesabat ixrac edildi",
+  "retention.purged": "Köhnə məlumatlar silindi",
   "reservation.created": "Otaq rezerv edildi",
   "reservation.cancelled": "Rezerv ləğv edildi",
   "reservation.cancelled.staff": "Əməkdaş rezervi ləğv etdi",

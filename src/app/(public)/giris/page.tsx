@@ -33,7 +33,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       </div>
       <div className="card p-6 sm:p-10">
         <h1 className="text-2xl font-semibold text-brand-900">Daxil ol</h1>
-        <p className="mt-1.5 text-sm text-brand-900/65">Universitet e-poçtunuza birdəfəlik giriş kodu göndəriləcək.</p>
+        <p className="mt-1.5 text-sm text-brand-900/65">Universitet e-poçtunuz və şifrənizlə daxil olun. İlk dəfədirsə, şifrəni elə indi təyin edəcəksiniz.</p>
         {sp.xeta && <Alert tone="danger" className="mt-5">{sp.xeta}</Alert>}
         {ms && (
           <>
@@ -41,11 +41,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               <svg viewBox="0 0 21 21" className="size-5" aria-hidden><path fill="#f25022" d="M1 1h9v9H1z" /><path fill="#00a4ef" d="M1 11h9v9H1z" /><path fill="#7fba00" d="M11 1h9v9h-9z" /><path fill="#ffb900" d="M11 11h9v9h-9z" /></svg>
               Microsoft 365 (Outlook) ilə daxil ol
             </a>
-            <div className="my-6 flex items-center gap-3 text-xs text-brand-900/45"><span className="h-px flex-1 bg-brand-100" />və ya e-poçt kodu ilə<span className="h-px flex-1 bg-brand-100" /></div>
+            <div className="my-6 flex items-center gap-3 text-xs text-brand-900/45"><span className="h-px flex-1 bg-brand-100" />və ya e-poçt və şifrə ilə<span className="h-px flex-1 bg-brand-100" /></div>
           </>
         )}
         <div className={ms ? "" : "mt-6"}>
-          <LoginForm next={next} domain={env.allowedDomains[0] ?? "qu.edu.az"} devMailbox={env.mailMode === "log" && env.devMailbox && !env.devMailboxKey} />
+          <LoginForm next={next} domain={env.allowedDomains[0] ?? "qu.edu.az"} />
         </div>
         <p className="mt-6 text-xs leading-relaxed text-brand-900/50">
           Daxil olmaqla Kitabxanadan istifadə qaydaları ilə tanış olduğunuzu təsdiq edirsiniz. Şəxsi məlumatlarınız yalnız rezervasiya məqsədilə istifadə olunur.

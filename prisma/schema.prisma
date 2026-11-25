@@ -14,10 +14,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// SUPERADMIN — bütün kitabxanalar və struktur dəyişikliklər;
+/// SUPERVISOR — yalnız təyin olunduğu fakültə kitabxanası (əməliyyat + hesabat)
 enum Role {
   STUDENT
-  STAFF
-  ADMIN
+  SUPERVISOR
+  SUPERADMIN
 }
 
 enum UserType {
@@ -84,10 +86,21 @@ enum BlockReason {
 model User {
   id                 String    @id @default(cuid())
   email              String    @unique
+  /// Göstəriş adı (firstName + lastName)
   name               String?
+  firstName          String?
+  lastName           String?
+  /// scrypt hash (Microsoft SSO istifadəçilərində boş ola bilər)
+  passwordHash       String?
+  passwordSetAt      DateTime?
+  /// Admin şifrəni sıfırladıqda növbəti girişdə dəyişdirilməlidir
+  mustChangePassword Boolean   @default(false)
+  emailVerifiedAt    DateTime?
   role               Role      @default(STUDENT)
   userType           UserType?
+  /// Fakültə adı (göstəriş/export üçün) + əlaqə
   faculty            String?
+  facultyId          String?
   specialty          String?
   groupName          String?
   course             Int?
@@ -97,6 +110,8 @@ model User {
   profileCompletedAt DateTime?
   /// Universitet kataloqu / Entra ID obyekt identifikatoru (inteqrasiya üçün)
   externalId         String?   @unique
+  /// SUPERVISOR üçün: məsul olduğu kitabxana
+  libraryId          String?
   noShowStrikes      Int       @default(0)
   blockedAt          DateTime?
   blockedReason      String?
@@ -114,8 +129,34 @@ model User {
   blocks                UserBlock[]              @relation("BlockedUser")
   notifications         Notification[]
   auditLogs             AuditLog[]
+  facultyRef            Faculty?                 @relation(fields: [facultyId], references: [id])
+  library               Library?                 @relation("SupervisorLibrary", fields: [libraryId], references: [id])
 
   @@index([role])
+  @@index([facultyId])
+}
+
+model Faculty {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  shortName String?
+  sortOrder Int       @default(0)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  users     User[]
+  libraries Library[]
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  ip        String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
 }
 
 model Session {
@@ -139,34 +180,44 @@ model LoginCode {
   attempts   Int       @default(0)
   consumedAt DateTime?
   ip         String?
+  /// login | verify | reset
+  purpose    String    @default("login")
   createdAt  DateTime  @default(now())
 
   @@index([email, createdAt])
 }
 
 model Library {
-  id          String   @id @default(cuid())
-  slug        String   @unique
-  name        String
-  shortName   String
-  building    String
-  address     String?
-  description String?
-  /// Gün ərzində dəqiqə ilə (540 = 09:00)
-  openMinute  Int      @default(540)
-  closeMinute Int      @default(1080)
+  id                 String    @id @default(cuid())
+  slug               String    @unique
+  name               String
+  shortName          String
+  building           String
+  address            String?
+  description        String?
+  /// Kitabxananın yerləşdiyi fakültə (istəyə bağlı)
+  facultyId          String?
+  /// İş saatları — gün ərzində dəqiqə ilə (540 = 09:00)
+  openMinute         Int       @default(540)
+  closeMinute        Int       @default(1080)
+  /// Otaq rezervasiyası üçün ilk başlanğıc / son bitmə vaxtı (null = iş saatları)
+  bookingStartMinute Int?
+  bookingEndMinute   Int?
   /// ISO həftə günləri, vergüllə (1 = B.e … 7 = Bazar)
-  workDays    String   @default("1,2,3,4,5")
-  coverPhoto  String?
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  workDays           String    @default("1,2,3,4,5")
+  coverPhoto         String?
+  isActive           Boolean   @default(true)
+  archivedAt         DateTime?
+  sortOrder          Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  rooms      Room[]
-  equipment  Equipment[]
-  closedDays ClosedDay[]
-  waitlist   WaitlistEntry[]
+  faculty     Faculty?        @relation(fields: [facultyId], references: [id])
+  rooms       Room[]
+  equipment   Equipment[]
+  closedDays  ClosedDay[]
+  waitlist    WaitlistEntry[]
+  supervisors User[]          @relation("SupervisorLibrary")
 }
 
 model ClosedDay {
@@ -183,21 +234,27 @@ model ClosedDay {
 }
 
 model Room {
-  id          String   @id @default(cuid())
-  libraryId   String
-  slug        String
-  name        String
+  id               String    @id @default(cuid())
+  libraryId        String
+  slug             String
+  name             String
   /// Qapı üzərindəki kod (məs. BO203)
-  code        String?
-  capacity    Int      @default(8)
-  description String?
+  code             String?
+  capacity         Int       @default(8)
+  description      String?
   /// Sətir-sətir siyahı (portativlik üçün String)
-  features    String   @default("")
-  qrToken     String   @unique
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  features         String    @default("")
+  qrToken          String    @unique
+  isActive         Boolean   @default(true)
+  /// Təmirdə — rezerv oluna bilməz
+  underMaintenance Boolean   @default(false)
+  maintenanceNote  String?
+  maintenanceSince DateTime?
+  /// Silinmiş (tarixçə analitika üçün saxlanılır)
+  archivedAt       DateTime?
+  sortOrder        Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   library      Library         @relation(fields: [libraryId], references: [id], onDelete: Cascade)
   photos       RoomPhoto[]
@@ -318,20 +375,24 @@ model ExtensionRequest {
 }
 
 model Equipment {
-  id          String        @id @default(cuid())
-  libraryId   String
-  type        EquipmentType
+  id               String        @id @default(cuid())
+  libraryId        String
+  type             EquipmentType
   /// Etiket nömrəsi (məs. NB-01)
-  assetTag    String        @unique
-  name        String
-  description String?
-  photoUrl    String?
-  qrToken     String        @unique
-  isActive    Boolean       @default(true)
-  sortOrder   Int           @default(0)
-  notes       String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  assetTag         String        @unique
+  name             String
+  description      String?
+  photoUrl         String?
+  qrToken          String        @unique
+  isActive         Boolean       @default(true)
+  underMaintenance Boolean       @default(false)
+  maintenanceNote  String?
+  maintenanceSince DateTime?
+  archivedAt       DateTime?
+  sortOrder        Int           @default(0)
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   library      Library                @relation(fields: [libraryId], references: [id], onDelete: Cascade)
   reservations EquipmentReservation[]

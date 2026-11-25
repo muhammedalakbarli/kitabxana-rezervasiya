@@ -4,8 +4,19 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { qrToken } from "../src/lib/tokens";
+import { hashPassword } from "../src/lib/password";
 
 const db = new PrismaClient();
+
+/** Fakültələrin ilkin siyahısı — super admin paneldən dəyişdirilə bilər */
+const FACULTIES = [
+  { name: "Mühəndislik fakültəsi", shortName: "MF" },
+  { name: "Biznes və iqtisadiyyat fakültəsi", shortName: "BİF" },
+  { name: "Pedaqoji fakültə", shortName: "PF" },
+  { name: "Humanitar və sosial elmlər fakültəsi", shortName: "HSEF" },
+  { name: "İncəsənət fakültəsi", shortName: "İF" },
+  { name: "Tibb fakültəsi", shortName: "TF" },
+];
 
 const libraries = [
   {
@@ -39,11 +50,15 @@ const libraries = [
 ];
 
 async function main() {
-  // --if-empty: baza artıq doludursa heç nə etmə (hər deploy-da təhlükəsiz işlədilə bilər)
-  if (process.argv.includes("--if-empty") && (await db.library.count()) > 0) {
-    console.log("Seed buraxıldı: baza artıq məlumat ehtiva edir.");
-    return;
+  // 1) Fakültələr (yalnız cədvəl boşdursa)
+  if ((await db.faculty.count()) === 0) {
+    for (const [i, f] of FACULTIES.entries()) await db.faculty.create({ data: { ...f, sortOrder: i + 1 } });
+    console.log(`${FACULTIES.length} fakültə əlavə edildi`);
   }
+
+  // 2) Kitabxanalar, otaqlar, avadanlıq (--if-empty: baza doludursa toxunma)
+  const skipStructure = process.argv.includes("--if-empty") && (await db.library.count()) > 0;
+  if (!skipStructure) {
   for (const lib of libraries) {
     const { rooms, ...data } = lib;
     const l = await db.library.upsert({ where: { slug: lib.slug }, create: data, update: {} });
@@ -72,13 +87,13 @@ async function main() {
     }
   }
 
-  const main = await db.library.findUniqueOrThrow({ where: { slug: "esas-bina" } });
+  const mainLib = await db.library.findUniqueOrThrow({ where: { slug: "esas-bina" } });
   for (let i = 1; i <= 5; i++) {
     const tag = `NB-0${i}`;
     await db.equipment.upsert({
       where: { assetTag: tag },
       create: {
-        libraryId: main.id,
+        libraryId: mainLib.id,
         type: "LAPTOP",
         assetTag: tag,
         name: `Noutbuk ${i}`,
@@ -95,7 +110,7 @@ async function main() {
     await db.equipment.upsert({
       where: { assetTag: tag },
       create: {
-        libraryId: main.id,
+        libraryId: mainLib.id,
         type: "ADAPTER",
         assetTag: tag,
         name: `Adapter ${i}`,
@@ -108,16 +123,54 @@ async function main() {
     });
   }
 
-  const adminEmails = (process.env.ADMIN_EMAILS ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-  for (const email of adminEmails) {
-    await db.user.upsert({
-      where: { email },
-      create: { email, role: "ADMIN", name: "Kitabxana Administratoru", userType: "EMPLOYEE", department: "Kitabxana", profileCompletedAt: new Date() },
-      update: { role: "ADMIN" },
-    });
+  } else {
+    console.log("Struktur buraxıldı: kitabxanalar artıq mövcuddur.");
   }
+
+  // 3) Kitabxananı fakültəyə bağla (boşdursa)
+  const bif = await db.faculty.findFirst({ where: { name: "Biznes və iqtisadiyyat fakültəsi" } });
+  if (bif) await db.library.updateMany({ where: { slug: "iqtisadiyyat", facultyId: null }, data: { facultyId: bif.id } });
+
+  // 4) Super admin(lər) — şifrə yalnız boşdursa SEED_SUPERADMIN_PASSWORD-dan
+  const adminEmails = (process.env.ADMIN_EMAILS ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const saPw = process.env.SEED_SUPERADMIN_PASSWORD;
+  for (const email of adminEmails) {
+    const u = await db.user.upsert({
+      where: { email },
+      create: { email, role: "SUPERADMIN", name: "Kitabxana Administratoru", firstName: "Kitabxana", lastName: "Administratoru", userType: "EMPLOYEE", department: "Kitabxana", profileCompletedAt: new Date() },
+      update: { role: "SUPERADMIN", libraryId: null },
+    });
+    if (!u.passwordHash && saPw) {
+      await db.user.update({ where: { id: u.id }, data: { passwordHash: await hashPassword(saPw), passwordSetAt: new Date(), emailVerifiedAt: new Date() } });
+      console.log(`Super admin şifrəsi təyin edildi: ${email}`);
+    }
+  }
+
+  // 5) Demo supervayzerlər (yalnız SEED_SUPERVISOR_PASSWORD verilibsə)
+  const svPw = process.env.SEED_SUPERVISOR_PASSWORD;
+  if (svPw) {
+    const demo = [
+      { email: "esas.admin@qu.edu.az", firstName: "Əsas bina", lastName: "Supervayzeri", slug: "esas-bina" },
+      { email: "bif.admin@qu.edu.az", firstName: "BİF", lastName: "Supervayzeri", slug: "iqtisadiyyat" },
+    ];
+    for (const d of demo) {
+      const lib = await db.library.findUnique({ where: { slug: d.slug } });
+      if (!lib) continue;
+      const existing = await db.user.findUnique({ where: { email: d.email } });
+      if (existing) continue;
+      await db.user.create({
+        data: {
+          email: d.email, role: "SUPERVISOR", libraryId: lib.id, firstName: d.firstName, lastName: d.lastName, name: `${d.firstName} ${d.lastName}`,
+          userType: "EMPLOYEE", department: `${lib.shortName} kitabxanası`, profileCompletedAt: new Date(),
+          passwordHash: await hashPassword(svPw), passwordSetAt: new Date(), emailVerifiedAt: new Date(),
+        },
+      });
+      console.log(`Demo supervayzer yaradıldı: ${d.email}`);
+    }
+  }
+
   const counts = await Promise.all([db.library.count(), db.room.count(), db.equipment.count(), db.user.count()]);
-  console.log(`Seed tamamlandı: ${counts[0]} kitabxana, ${counts[1]} otaq, ${counts[2]} avadanlıq, ${counts[3]} istifadəçi`);
+  console.log(`Seed tamamlandı: ${counts[0]} kitabxana, ${counts[1]} otaq, ${counts[2]} avadanlıq, ${counts[3]} istifadəçi, ${await db.faculty.count()} fakültə`);
 }
 
 main()

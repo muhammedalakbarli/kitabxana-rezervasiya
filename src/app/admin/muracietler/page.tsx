@@ -13,11 +13,12 @@ import { dayKey, fmtDateTime, fmtDay, fmtRange, fmtRelative, fmtTime } from "@/l
 export const metadata: Metadata = { title: "Müraciətlər" };
 
 export default async function RequestsPage() {
-  await requireStaff();
+  const ctx = await requireStaff();
+  const scope = ctx.libraryId ? { reservation: { room: { libraryId: ctx.libraryId } } } : {};
   const include = { requester: true, decidedBy: true, reservation: { include: { room: { include: { library: true } } } } } as const;
   const [pending, history] = await Promise.all([
-    db.extensionRequest.findMany({ where: { status: "PENDING" }, include, orderBy: { createdAt: "asc" } }),
-    db.extensionRequest.findMany({ where: { status: { not: "PENDING" } }, include, orderBy: { createdAt: "desc" }, take: 30 }),
+    db.extensionRequest.findMany({ where: { status: "PENDING", ...scope }, include, orderBy: { createdAt: "asc" } }),
+    db.extensionRequest.findMany({ where: { status: { not: "PENDING" }, ...scope }, include, orderBy: { createdAt: "desc" }, take: 30 }),
   ]);
   const feas = await Promise.all(pending.map((q) => extensionFeasibility(q.id)));
 

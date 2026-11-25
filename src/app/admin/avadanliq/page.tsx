@@ -16,19 +16,20 @@ import { addDays, dayKey, fmtRange, fmtRelative, fmtTime, hhmm, minutesOfDay, zo
 export const metadata: Metadata = { title: "Avadanlıq masası" };
 
 export default async function DeskPage() {
-  await requireStaff();
+  const ctx = await requireStaff();
   await runSweep();
+  const scope = ctx.libraryId ? { equipment: { libraryId: ctx.libraryId } } : {};
   const rules = await getRules();
   const today = dayKey(new Date());
   const from = zoned(today, 0);
   const to = zoned(addDays(today, 1), 0);
   const include = { equipment: { include: { library: true } }, user: true } as const;
   const [toIssue, inUse, overdue, done, allEq] = await Promise.all([
-    db.equipmentReservation.findMany({ where: { status: "BOOKED", startAt: { gte: from, lt: to } }, include, orderBy: { startAt: "asc" } }),
-    db.equipmentReservation.findMany({ where: { status: "ISSUED" }, include, orderBy: { endAt: "asc" } }),
-    db.equipmentReservation.findMany({ where: { status: "OVERDUE" }, include, orderBy: { endAt: "asc" } }),
-    db.equipmentReservation.findMany({ where: { status: { in: ["RETURNED", "NO_SHOW", "CANCELLED"] }, startAt: { gte: from, lt: to } }, include, orderBy: { updatedAt: "desc" }, take: 30 }),
-    db.equipment.findMany({ where: { isActive: true }, include: { library: true }, orderBy: [{ type: "asc" }, { sortOrder: "asc" }] }),
+    db.equipmentReservation.findMany({ where: { status: "BOOKED", startAt: { gte: from, lt: to }, ...scope }, include, orderBy: { startAt: "asc" } }),
+    db.equipmentReservation.findMany({ where: { status: "ISSUED", ...scope }, include, orderBy: { endAt: "asc" } }),
+    db.equipmentReservation.findMany({ where: { status: "OVERDUE", ...scope }, include, orderBy: { endAt: "asc" } }),
+    db.equipmentReservation.findMany({ where: { status: { in: ["RETURNED", "NO_SHOW", "CANCELLED"] }, startAt: { gte: from, lt: to }, ...scope }, include, orderBy: { updatedAt: "desc" }, take: 30 }),
+    db.equipment.findMany({ where: { isActive: true, archivedAt: null, underMaintenance: false, ...(ctx.libraryId ? { libraryId: ctx.libraryId } : {}) }, include: { library: true }, orderBy: [{ type: "asc" }, { sortOrder: "asc" }] }),
   ]);
   const step = 5;
   const defaultStart = hhmm(Math.ceil(minutesOfDay(new Date()) / step) * step % 1440);

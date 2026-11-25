@@ -40,6 +40,10 @@ export const rulesSchema = z.object({
   equipmentPickupGraceMinutes: z.number().int().min(5).max(120),
   /** Bitmə vaxtından neçə dəqiqə sonra qaytarılmayan avadanlıq → avtomatik blok */
   equipmentReturnGraceMinutes: z.number().int().min(0).max(120),
+
+  // ── Məlumatların saxlanması ──────────────────────────────
+  /** Rezervasiya tarixçəsi və jurnallar neçə gün saxlanılır (standart 1 il) */
+  retentionDays: z.number().int().min(30).max(3650),
 });
 
 export type Rules = z.infer<typeof rulesSchema>;
@@ -65,6 +69,7 @@ export const DEFAULT_RULES: Rules = {
   equipmentDailyLimit: 1,
   equipmentPickupGraceMinutes: 15,
   equipmentReturnGraceMinutes: 10,
+  retentionDays: 365,
 };
 
 /** Otaq tutumu (tələb: maksimum 8 nəfər) — otaq səviyyəsində dəyişdirilə bilər */

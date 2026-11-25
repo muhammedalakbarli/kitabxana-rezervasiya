@@ -9,7 +9,7 @@ import { notify } from "./notify";
 import { audit } from "./audit";
 import { getRules } from "./settings";
 import { blockingIntervals, closedDaysFor, roomBlocks } from "./availability";
-import { isWorkDay, subtractIntervals } from "./rules";
+import { isWorkDay, roomHours, subtractIntervals } from "./rules";
 import { MINUTE, addDays, dayKey, fmtDay, fmtRange, fmtTime, zoned } from "./time";
 import type { Result } from "./reservations";
 
@@ -23,6 +23,7 @@ export async function joinWaitlist(
   const rules = await getRules();
   const me = await db.user.findUniqueOrThrow({ where: { id: user.id } });
   if (me.blockedAt) return fail("Hesabınız bloklanıb.");
+  if (!me.profileCompletedAt) return fail("Əvvəlcə profil məlumatlarınızı tamamlayın.");
   const lib = await db.library.findUnique({ where: { id: input.libraryId } });
   if (!lib || !lib.isActive) return fail("Kitabxana tapılmadı.");
   if (input.roomId) {
@@ -37,7 +38,8 @@ export async function joinWaitlist(
   const closed = await closedDaysFor(lib.id);
   if (!isWorkDay(day, lib, closed)) return fail("Kitabxana həmin gün işləmir.");
   if (day > addDays(dayKey(now), rules.maxAdvanceDays)) return fail(`Ən çox ${rules.maxAdvanceDays} gün əvvəldən növbəyə yazılmaq olar.`);
-  if (input.start < zoned(day, lib.openMinute) || input.end > zoned(day, lib.closeMinute)) return fail("Vaxt iş saatları daxilində olmalıdır.");
+  const hours = roomHours(lib);
+  if (input.start < zoned(day, hours.openMinute) || input.end > zoned(day, hours.closeMinute)) return fail("Vaxt rezervasiya saatları daxilində olmalıdır.");
   const active = await db.waitlistEntry.count({ where: { userId: user.id, status: { in: ["WAITING", "NOTIFIED"] } } });
   if (active >= MAX_ACTIVE_ENTRIES) return fail(`Eyni anda ən çox ${MAX_ACTIVE_ENTRIES} növbə qeydiniz ola bilər.`);
   const dup = await db.waitlistEntry.findFirst({
@@ -109,7 +111,7 @@ export async function releaseRoomRange(roomId: string, fromRaw: Date, toRaw: Dat
       });
       if (!upd.count) continue;
       const day = dayKey(holdStart);
-      const link = `/rezerv/${room.library.slug}/otaq/${room.slug}?gun=${day}&bas=${holdStart.getTime()}`;
+      const link = `/rezerv?k=${room.library.slug}&otaq=${room.slug}&gun=${day}&bas=${holdStart.getTime()}`;
       await notify(c.userId, {
         type: "waitlist.available",
         title: "Gözlədiyiniz vaxt boşaldı!",

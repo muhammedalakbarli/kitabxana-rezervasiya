@@ -78,12 +78,14 @@ export async function createEquipmentReservation(
     user = (await db.user.findUnique({ where: { email } })) ?? (await db.user.create({ data: { email } }));
   } else {
     user = await db.user.findUniqueOrThrow({ where: { id: actor.id } });
+    if (!user.profileCompletedAt) return fail("Əvvəlcə profil məlumatlarınızı tamamlayın.");
     if (!input.rulesAccepted) return fail("Rezervasiya üçün avadanlıqdan istifadə qaydalarını qəbul etməlisiniz.");
   }
   if (user.blockedAt) return fail(byStaff ? "Bu istifadəçinin hesabı bloklanıb." : "Hesabınız bloklanıb. Bloku açmaq üçün kitabxana əməkdaşına müraciət edin.");
 
   const eq = await db.equipment.findUnique({ where: { id: input.equipmentId }, include: { library: true } });
-  if (!eq || !eq.isActive || !eq.library.isActive) return fail("Avadanlıq tapılmadı və ya texniki xidmətdədir.");
+  if (!eq || !eq.isActive || eq.archivedAt || !eq.library.isActive) return fail("Avadanlıq tapılmadı və ya əlçatan deyil.");
+  if (eq.underMaintenance) return fail(`Bu avadanlıq hazırda təmirdədir${eq.maintenanceNote ? ` (${eq.maintenanceNote})` : ""}.`);
 
   const now = new Date();
   let start = new Date(Math.floor(input.start.getTime() / MINUTE) * MINUTE);
@@ -296,7 +298,7 @@ export async function processEquipment(): Promise<number> {
       title: "Avadanlıq qaytarılmayıb",
       body: `${r.equipment.name} (${r.equipment.assetTag}) — ${r.user.name ?? r.user.email}, qaytarma vaxtı ${fmtTime(r.endAt)}`,
       link: "/admin/avadanliq",
-    });
+    }, r.equipment.libraryId);
   }
   return n;
 }

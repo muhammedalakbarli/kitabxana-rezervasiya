@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge, Card, PageHeader, cx } from "@/components/ui";
-import { requireStaff } from "@/lib/auth";
+import { requireSuperAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { auditLabel } from "@/lib/labels";
 import { fmtDateTime } from "@/lib/time";
@@ -9,7 +9,7 @@ import { fmtDateTime } from "@/lib/time";
 export const metadata: Metadata = { title: "Jurnal" };
 
 export default async function JournalPage({ searchParams }: { searchParams: Promise<{ bolme?: string }> }) {
-  await requireStaff();
+  await requireSuperAdmin();
   const tab = (await searchParams).bolme === "poct" ? "mail" : "audit";
   const [audit, mail] = await Promise.all([
     tab === "audit" ? db.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 200, include: { actor: { select: { name: true, email: true } } } }) : [],

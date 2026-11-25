@@ -5,6 +5,7 @@
  *  3. Növbə: vaxtı bitən "hold"ları növbətiyə ötür
  *  4. Avadanlıq: götürülməyən rezervləri ləğv et, qaytarılmayanları blokla
  *  5. Göndərilməmiş məktubları təkrar göndər
+ *  6. Saxlama müddəti (standart 1 il) bitmiş tarixçəni sil
  *
  * Çağırılma yolları: scripts/worker.ts (hər 30 san), /api/cron (xarici cron),
  * həmçinin səhifə yüklənərkən (throttle ilə) — worker işləməsə belə məntiq düzgün qalır.
@@ -13,12 +14,13 @@ import { completeEndedReservations, finalizeDueReservations } from "./reservatio
 import { processWaitlist } from "./waitlist";
 import { processEquipment } from "./equipment";
 import { retryMail } from "./mail";
+import { purgeOldData } from "./management";
 
 let lastRun = 0;
 let running: Promise<SweepReport> | null = null;
 const THROTTLE_MS = 15_000;
 
-export type SweepReport = { finalized: number; completed: number; waitlist: number; equipment: number; mail: number; ms: number };
+export type SweepReport = { finalized: number; completed: number; waitlist: number; equipment: number; mail: number; purged: number; ms: number };
 
 export async function runSweep(force = false): Promise<SweepReport | null> {
   if (running) return running;
@@ -39,7 +41,8 @@ export async function runSweep(force = false): Promise<SweepReport | null> {
     const waitlist = await step("waitlist", processWaitlist);
     const equipment = await step("equipment", processEquipment);
     const mail = await step("mail", retryMail);
-    return { finalized, completed, waitlist, equipment, mail, ms: Date.now() - t0 };
+    const purged = await step("retention", () => purgeOldData());
+    return { finalized, completed, waitlist, equipment, mail, purged, ms: Date.now() - t0 };
   })();
   try {
     return await running;

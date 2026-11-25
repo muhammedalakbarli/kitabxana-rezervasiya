@@ -45,7 +45,8 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-brand-900 sm:text-[28px]">{greet}{firstName ? `, ${firstName}` : ""}!</h1>
         </div>
         <div className="flex gap-2">
-          <LinkButton href="/rezerv" ><CalendarPlus className="size-4" /> Yeni rezervasiya</LinkButton>
+          <LinkButton href="/rezerv"><CalendarPlus className="size-4" /> Otaq rezerv et</LinkButton>
+          <LinkButton href="/avadanliq" variant="secondary"><Laptop className="size-4" /> Avadanlıq</LinkButton>
         </div>
       </div>
 
@@ -108,7 +109,7 @@ export default async function DashboardPage() {
               <p className="mt-1 text-sm text-brand-900/65">Binanızı seçin və fərdi oxu otağını və ya noutbuku bir neçə saniyəyə rezerv edin.</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {libraries.map((l) => (
-                  <LinkButton key={l.slug} href={`/rezerv/${l.slug}`} variant="secondary" size="sm"><DoorOpen className="size-4" /> {l.shortName}</LinkButton>
+                  <LinkButton key={l.slug} href={`/rezerv?k=${l.slug}`} variant="secondary" size="sm"><DoorOpen className="size-4" /> {l.shortName}</LinkButton>
                 ))}
               </div>
             </div>
@@ -137,7 +138,7 @@ export default async function DashboardPage() {
 
       <div className="grid gap-8 lg:grid-cols-2">
         <section>
-          <SectionTitle action={<Link href="/rezervasiyalarim" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600">Hamısı <ArrowRight className="size-4" /></Link>}>Otaq rezervasiyaları</SectionTitle>
+          <SectionTitle action={<Link href="/tarixce" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600">Tarixçə <ArrowRight className="size-4" /></Link>}>Otaq rezervasiyaları</SectionTitle>
           {mine.length ? (
             <div className="space-y-3">
               {mine.slice(0, 4).map((r) => {
@@ -154,7 +155,7 @@ export default async function DashboardPage() {
           {equipment.length ? (
             <div className="space-y-3">{equipment.map((r) => <EquipmentReservationCard key={r.id} r={r} />)}</div>
           ) : (
-            <EmptyState icon={<Laptop />} title="Aktiv avadanlıq rezervasiyası yoxdur" text="Noutbuk və adapterləri kitabxana səhifəsindəki “Avadanlıq” bölməsindən rezerv edin." />
+            <EmptyState icon={<Laptop />} title="Aktiv avadanlıq rezervasiyası yoxdur" action={<LinkButton href="/avadanliq" size="sm" variant="secondary">Noutbuk və ya adapter rezerv et</LinkButton>} />
           )}
         </section>
       </div>

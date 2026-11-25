@@ -18,11 +18,11 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const q = sp.q?.trim();
   const filter = sp.f ?? "all";
   const where: Prisma.UserWhereInput = {
-    ...(q ? { OR: [{ email: { contains: q, mode: "insensitive" } }, { name: { contains: q, mode: "insensitive" } }, { groupName: { contains: q, mode: "insensitive" } }] } : {}),
-    ...(filter === "blocked" ? { blockedAt: { not: null } } : filter === "strikes" ? { noShowStrikes: { gt: 0 } } : filter === "staff" ? { role: { in: ["STAFF", "ADMIN"] } } : {}),
+    ...(q ? { OR: [{ email: { contains: q, mode: "insensitive" } }, { name: { contains: q, mode: "insensitive" } }, { groupName: { contains: q, mode: "insensitive" } }, { faculty: { contains: q, mode: "insensitive" } }] } : {}),
+    ...(filter === "blocked" ? { blockedAt: { not: null } } : filter === "strikes" ? { noShowStrikes: { gt: 0 } } : filter === "staff" ? { role: { in: ["SUPERVISOR", "SUPERADMIN"] } } : {}),
   };
   const [users, total] = await Promise.all([
-    db.user.findMany({ where, orderBy: [{ blockedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }], take: 200 }),
+    db.user.findMany({ where, include: { library: { select: { shortName: true } } }, orderBy: [{ blockedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }], take: 300 }),
     db.user.count({ where }),
   ]);
   const tabs = [["all", "Hamısı"], ["blocked", "Bloklanmış"], ["strikes", "Xəbərdarlığı olan"], ["staff", "Əməkdaşlar"]];
@@ -37,7 +37,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         </div>
         <form className="flex gap-2">
           <input type="hidden" name="f" value={filter} />
-          <input name="q" defaultValue={q} placeholder="Ad, e-poçt və ya qrup" className="field-input w-64 text-sm" />
+          <input name="q" defaultValue={q} placeholder="Ad, e-poçt, fakültə və ya qrup" className="field-input w-64 text-sm" />
           <button className={btn("secondary")} aria-label="Axtar"><Search className="size-4" /></button>
         </form>
       </div>
@@ -57,9 +57,9 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                     </Link>
                   </td>
                   <td className="px-4 py-2.5 text-brand-900/75">{u.userType ? <span className="block text-xs text-brand-900/50">{USER_TYPE_LABELS[u.userType]}</span> : null}{u.faculty ?? u.department ?? "—"}{u.groupName ? ` · ${u.groupName}` : ""}{u.course ? ` · ${u.course}-ci kurs` : ""}</td>
-                  <td className="px-4 py-2.5"><Badge tone={u.role === "STUDENT" ? "neutral" : "brand"}>{ROLE_LABELS[u.role]}</Badge></td>
+                  <td className="px-4 py-2.5"><Badge tone={u.role === "STUDENT" ? "neutral" : "brand"}>{ROLE_LABELS[u.role]}</Badge>{u.library && <span className="mt-0.5 block text-xs text-brand-900/50">{u.library.shortName}</span>}</td>
                   <td className={cx("px-4 py-2.5 font-semibold", u.noShowStrikes ? "text-danger" : "text-brand-900/50")}>{u.noShowStrikes}/{rules.noShowLimit}</td>
-                  <td className="px-4 py-2.5">{u.blockedAt ? <Badge tone="danger">Bloklanıb</Badge> : u.profileCompletedAt ? <Badge tone="success">Aktiv</Badge> : <Badge tone="warning">Profil natamam</Badge>}</td>
+                  <td className="px-4 py-2.5">{u.blockedAt ? <Badge tone="danger">Bloklanıb</Badge> : !u.passwordHash && !u.externalId ? <Badge tone="neutral">Qeydiyyat tamamlanmayıb</Badge> : u.profileCompletedAt ? <Badge tone="success">Aktiv</Badge> : <Badge tone="warning">Profil natamam</Badge>}</td>
                   <td className="px-4 py-2.5 text-xs text-brand-900/55">{u.lastLoginAt ? fmtDateTime(u.lastLoginAt) : "—"}</td>
                 </tr>
               ))}

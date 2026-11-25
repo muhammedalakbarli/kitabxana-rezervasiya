@@ -105,7 +105,7 @@ export function WaitlistCard({ w, back }: { w: WaitlistEntry & { library: Librar
         </div>
         <div className="flex gap-2">
           {notified && (
-            <LinkButton size="sm" href={`/rezerv/${w.library.slug}/otaq/${w.holdRoom!.slug}?gun=${dayKey(w.holdStartAt!)}&bas=${w.holdStartAt!.getTime()}`}>İndi rezerv et</LinkButton>
+            <LinkButton size="sm" href={`/rezerv?k=${w.library.slug}&otaq=${w.holdRoom!.slug}&gun=${dayKey(w.holdStartAt!)}&bas=${w.holdStartAt!.getTime()}`}>İndi rezerv et</LinkButton>
           )}
           <form action={cancelWaitlistAction}>
             <input type="hidden" name="id" value={w.id} />

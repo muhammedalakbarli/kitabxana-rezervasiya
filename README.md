@@ -11,8 +11,13 @@ Qarabağ Universiteti Kitabxanasının **fərdi oxu otaqları**, **noutbuk** və
 
 | Tələb | Həll |
 |---|---|
-| Yalnız `@qu.edu.az` ilə giriş | E-poçta birdəfəlik 6 rəqəmli kod göndərilir. **Microsoft 365 (Entra ID)** ilə giriş də hazırdır, açarlar əlavə olunduqda aktivləşir |
-| Fakültə, ixtisas, qrup, kurs | İlk girişdə tələbə özü doldurur. `User.externalId` sahəsi universitet kataloqu ilə sinxronizasiya üçün ayrılıb |
+| Yalnız `@qu.edu.az` ilə giriş | **E-poçt + şifrə.** İlk girişdə tələbə şifrə təyin edir. SMTP qoşulanda qeydiyyat və şifrə bərpası e-poçt kodu ilə təsdiqlənir. Şifrələr scrypt ilə saxlanılır. 15 dəqiqədə 5 uğursuz cəhddən sonra giriş müvəqqəti bloklanır. **Microsoft 365 (Entra ID)** ilə giriş də hazırdır |
+| Daxil olanda məlumat pəncərəsi | İlk girişdə pəncərə açılır: ad, soyad, fakültə (siyahıdan), ixtisas, kurs, qrup nömrəsi. `User.externalId` universitet kataloqu ilə sinxronizasiya üçün ayrılıb |
+| İki səviyyəli admin | **Super admin** bütün kitabxanaları idarə edir. Fakültə, kitabxana, otaq (tutum, şəkil), avadanlıq, təmir, silmə, iş saatları, ilk/son rezerv vaxtı, qaydalar və adminlər yalnız onun səlahiyyətindədir. Kitabxana seçici ilə hər fakültə kitabxanasının canlı vəziyyətinə keçir. **Supervayzer** yalnız təyin olunduğu fakültə kitabxanasını görür: canlı vəziyyət, rezervasiyalar, müraciətlər, avadanlıq masası, istifadəçilər, hesabatlar |
+| Analitika və export | Doluluq, gəlməmə nisbəti, həftə günü × saat xəritəsi; otaq, fakültə, kurs, qrup üzrə istifadə; ən aktiv tələbələr; avadanlıq. Supervayzer yalnız öz kitabxanasını görür, super admin isə kitabxanaları müqayisə edir. Export **Excel (13 vərəq)** və **CSV** formatında, istənilən tarix aralığı üçün |
+| Məlumat 1 il saxlanılır | Tarixçə, jurnallar və bildirişlər `retentionDays` (standart 365) gündən sonra avtomatik silinir. Hesabat istənilən aralıq üçün bu müddət daxilində ixrac olunur |
+| Sadə tələbə interfeysi | Rezervasiya **bir ekranda addım-addım** açılır: kitabxana → tarix və otaq → nəfər və vaxt → dəvət → təsdiq. **Avadanlıq** ayrıca paneldədir. Ayrıca **Profil** və **Tarixçə** panelləri var |
+| Məxfi dəvət | Dəvət edilən tələbə yalnız **tam e-poçt** yazıldıqda görünür (ad + fakültə/qrup). Siyahı və avtomatik tamamlama yoxdur |
 | 2 kitabxana × 3 otaq, gələcəkdə yeni binalar | Admin paneldən istənilən sayda kitabxana, otaq və avadanlıq əlavə edilir |
 | Müddət: 1 nəfər 1 saat, 2 nəfər 2 saat, 3 nəfər 3 saat, 4+ nəfər 4 saat; tutum 8 | Bütün limitlər admin tərəfindən dəyişdirilir. Tək nəfər üçün limit 1, 1.5 və ya 2 saat seçilə bilər |
 | Dəvət sistemi | Rezerv edən qrup yoldaşlarını dəvət edir, onlar qəbul edir. 4 və daha çox nəfər üçün 3 nəfəri dəvət etmək kifayətdir |
@@ -31,9 +36,11 @@ Qarabağ Universiteti Kitabxanasının **fərdi oxu otaqları**, **noutbuk** və
 **Admin paneli (`/admin`):** canlı cədvəl, rezervasiyalar (əl ilə təsdiq və ləğv), əlavə vaxt müraciətləri, avadanlıq masası (təhvil və qəbul, istifadəçi adına rezerv), istifadəçilər (blok açma, rol), kitabxanalar, otaqlar, avadanlıq və fotolar, QR çapı (və kodun yenilənməsi), qaydalar, bayram günləri, audit və e-poçt jurnalı.
 
 **Rollar:**
-- **İstifadəçi:** rezerv edir.
-- **Kitabxana əməkdaşı:** rezervasiyalar, müraciətlər, avadanlıq masası, bloklar.
-- **Administrator:** əlavə olaraq qaydaları, kitabxanaları və rolları idarə edir.
+- **Tələbə:** rezerv edir.
+- **Supervayzer** (fakültə kitabxanası admini): öz kitabxanasında əməliyyatları və hesabatları idarə edir.
+- **Super admin:** hər şeyi idarə edir.
+
+Supervayzer **Adminlər** bölməsindən təyin olunur, ona müvəqqəti şifrə verilir və ilk girişdə həmin şifrəni dəyişməlidir. Şifrəsini unudan tələbəyə admin istifadəçinin səhifəsindən müvəqqəti şifrə yarada bilər.
 
 ---
 
@@ -58,13 +65,13 @@ npm run dev                    # http://localhost:3000
 npm run worker:dev             # ayrıca terminalda — fon tapşırıqları
 ```
 
-Test rejimində (`MAIL_MODE=log`, `DEV_MAILBOX=true`) məktublar göndərilmir. Giriş kodu və bütün məktublar **`/dev/poct`** səhifəsində görünür. `ADMIN_EMAILS` siyahısındakı ünvan ilk girişdə avtomatik administrator olur.
+Test rejimində (`MAIL_MODE=log`) məktublar göndərilmir, onları **`/dev/poct`** səhifəsində görmək olar (`DEV_MAILBOX=true` olmalıdır). Super admin hesabının şifrəsini `SEED_SUPERADMIN_PASSWORD` dəyişəni təyin edir. `SEED_SUPERVISOR_PASSWORD` doldurularsa hər kitabxana üçün demo supervayzer yaradılır (`esas.admin@`, `bif.admin@`).
 
 ### Testlər
 
 ```bash
 npm test                       # qayda məntiqi (unit, 20 test)
-npm run test:integration       # real PostgreSQL üzərində domen ssenariləri (18 test)
+npm run test:integration       # real PostgreSQL üzərində domen ssenariləri (27 test)
 ```
 
 İnteqrasiya testləri bunları yoxlayır:
@@ -75,7 +82,10 @@ npm run test:integration       # real PostgreSQL üzərində domen ssenariləri 
 - qrupun qısaldılması;
 - növbədə vaxtın saxlanması və növbətiyə keçməsi;
 - əlavə vaxt müraciəti;
-- noutbukun uzadılması və qaytarılmayanda blok.
+- noutbukun uzadılması və qaytarılmayanda blok;
+- şifrə hash-i, dəvətin yalnız qeydiyyatlı tələbəyə getməsi;
+- təmirdə olan otağın rezerv olunmaması, ilk/son rezerv vaxtı;
+- analitika rəqəmləri, Excel faylı, 1 illik saxlama, supervayzerin əhatə dairəsi.
 
 ---
 
@@ -105,7 +115,7 @@ Layihə Vercel-də GitHub repo ilə əlaqələndirilib: `main` qoluna hər push 
 
 - **Baza:** Vercel Marketplace üzərindən Prisma Postgres. `DATABASE_URL` avtomatik əlavə olunur.
 - **Build:** `vercel-build` skripti işləyir: `prisma generate` → `prisma migrate deploy` → baza boşdursa seed → `next build`.
-- **Lazım olan dəyişənlər:** `AUTH_SECRET`, `CRON_SECRET`, `APP_URL`, `ALLOWED_EMAIL_DOMAINS`, `ADMIN_EMAILS`, `MAIL_MODE`. Demo üçün əlavə olaraq `DEV_MAILBOX=true` və `DEV_MAILBOX_KEY` qoyulur: giriş kodları yalnız `/dev/poct?key=...` ünvanında görünür.
+- **Lazım olan dəyişənlər:** `AUTH_SECRET`, `CRON_SECRET`, `APP_URL`, `ALLOWED_EMAIL_DOMAINS`, `ADMIN_EMAILS`, `MAIL_MODE`, `SEED_SUPERADMIN_PASSWORD`. Demo supervayzerlər üçün `SEED_SUPERVISOR_PASSWORD`. Test poçtu üçün `DEV_MAILBOX=true` və `DEV_MAILBOX_KEY`: məktublar yalnız `/dev/poct?key=...` ünvanında görünür.
 - **Məhdudiyyətlər:**
   - Hobby planında cron gündə bir dəfə işləyir. Fon tapşırıqları hər səhifə açılışında da işləyir. Dəqiqəlik dəqiqlik üçün xarici cron (məs. cron-job.org) `GET /api/cron` ünvanına `Authorization: Bearer <CRON_SECRET>` başlığı ilə hər dəqiqə sorğu göndərə bilər.
   - Admin paneldən yüklənən fotolar Vercel-də müvəqqətidir (`/tmp`). Daimi saxlama üçün öz server (Docker) və ya Vercel Blob lazımdır.

@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { saveRulesAction } from "@/app/actions/admin";
-import type { FormState } from "@/app/actions/reservations";
+import type { FormState } from "@/app/actions/admin";
 import type { Rules } from "@/lib/rules-config";
 import { SubmitButton } from "./submit-button";
 import { Alert } from "./ui";
@@ -48,6 +48,12 @@ const groups: { title: string; fields: F[] }[] = [
       { key: "equipmentDailyLimit", label: "Gündəlik limit (hər növ üçün)", unit: "ədəd" },
       { key: "equipmentPickupGraceMinutes", label: "Götürülmə üçün güzəşt", unit: "dəq" },
       { key: "equipmentReturnGraceMinutes", label: "Qaytarma gecikməsinə güzəşt", unit: "dəq", hint: "Bundan sonra avtomatik blok" },
+    ],
+  },
+  {
+    title: "Məlumatların saxlanması",
+    fields: [
+      { key: "retentionDays", label: "Rezervasiya tarixçəsi və jurnallar saxlanılır", unit: "gün", hint: "Standart 365 gün (1 il). Hesabatlar bu müddət daxilində istənilən aralıq üçün ixrac oluna bilər; köhnə qeydlər avtomatik silinir." },
     ],
   },
 ];

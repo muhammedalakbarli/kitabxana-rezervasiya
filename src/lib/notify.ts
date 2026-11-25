@@ -48,8 +48,11 @@ export async function notify(userIds: string | string[], n: NotifyInput): Promis
   }
 }
 
-/** Bütün STAFF/ADMIN istifadəçilərinə */
-export async function notifyStaff(n: NotifyInput) {
-  const staff = await db.user.findMany({ where: { role: { in: ["STAFF", "ADMIN"] } }, select: { id: true } });
+/** Super adminlərə və (verilibsə) həmin kitabxananın supervayzerlərinə */
+export async function notifyStaff(n: NotifyInput, libraryId?: string | null) {
+  const staff = await db.user.findMany({
+    where: { OR: [{ role: "SUPERADMIN" }, ...(libraryId ? [{ role: "SUPERVISOR" as const, libraryId }] : [])] },
+    select: { id: true },
+  });
   await notify(staff.map((s) => s.id), n);
 }

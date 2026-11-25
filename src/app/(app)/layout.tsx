@@ -3,12 +3,15 @@ import { Bell } from "lucide-react";
 import { BrandMark, Emblem } from "@/components/logo";
 import { DesktopNav, MobileNav } from "@/components/app-nav";
 import { UserMenu } from "@/components/user-menu";
+import { OnboardingGate } from "@/components/profile-forms";
 import { getCurrentUser, isStaff } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   const unread = user ? await db.notification.count({ where: { userId: user.id, readAt: null } }) : 0;
+  const gate = user ? (user.mustChangePassword ? "password" : !user.profileCompletedAt ? "profile" : null) : null;
+  const faculties = gate === "profile" ? await db.faculty.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }) : [];
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="no-print sticky top-0 z-40 border-b border-brand-100/70 bg-white/90 backdrop-blur-md">
@@ -37,8 +40,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-6 pb-28 sm:px-6 md:pb-12">{children}</main>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-6 pb-28 sm:px-6 lg:pb-12">{children}</main>
       {user && <MobileNav />}
+      {user && gate && (
+        <OnboardingGate
+          mode={gate}
+          faculties={faculties}
+          initial={{
+            firstName: user.firstName ?? "", lastName: user.lastName ?? "", facultyId: user.facultyId ?? "", specialty: user.specialty ?? "",
+            course: user.course ? String(user.course) : "", groupName: user.groupName ?? "", email: user.email,
+          }}
+        />
+      )}
     </div>
   );
 }

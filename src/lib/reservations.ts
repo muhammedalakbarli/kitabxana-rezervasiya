@@ -11,7 +11,7 @@ import { notify, notifyStaff } from "./notify";
 import { audit } from "./audit";
 import { getRules } from "./settings";
 import { blockingIntervals, closedDaysFor, roomBlocks, ACTIVE_ROOM_STATUSES } from "./availability";
-import { checkInWindow, effectiveEnd, isWorkDay, maxMinutesForCategory, overlaps, requiredInvitees } from "./rules";
+import { checkInWindow, effectiveEnd, isWorkDay, maxMinutesForCategory, overlaps, requiredInvitees, roomHours } from "./rules";
 import { DEFAULT_ROOM_CAPACITY, GROUP_MIN_MEMBERS, PARTY_LABELS, type PartyCategory } from "./rules-config";
 import { MINUTE, addDays, dayKey, fmtDay, fmtDuration, fmtRange, fmtTime, zoned } from "./time";
 import { applyBlock } from "./blocks";
@@ -118,9 +118,10 @@ async function userDailyCount(tx: Tx, userId: string, day: string, excludeReserv
   });
 }
 
-async function ensureInvitee(tx: Tx, email: string): Promise<User> {
-  const e = normalizeEmail(email);
-  return (await tx.user.findUnique({ where: { email: e } })) ?? tx.user.create({ data: { email: e } });
+/** Dəvət yalnız qeydiyyatdan keçmiş və profilini tamamlamış tələbəyə (tam e-poçt ilə) */
+async function findInvitee(tx: Tx, email: string): Promise<User | null> {
+  const u = await tx.user.findUnique({ where: { email: normalizeEmail(email) } });
+  return u && u.profileCompletedAt ? u : null;
 }
 
 // ── Rezervasiyanın yaradılması ───────────────────────────────────────
@@ -140,11 +141,13 @@ export async function createRoomReservation(actor: User, input: CreateRoomReserv
   const rules = await getRules();
   const user = await db.user.findUniqueOrThrow({ where: { id: actor.id } });
   if (user.blockedAt) return fail("Hesabınız bloklanıb. Bloku açmaq üçün kitabxana əməkdaşına müraciət edin.");
+  if (!user.profileCompletedAt) return fail("Əvvəlcə profil məlumatlarınızı tamamlayın.");
   if (!input.rulesAccepted) return fail("Rezervasiya üçün kitabxanadan istifadə qaydalarını qəbul etməlisiniz.");
   if (![1, 2, 3, 4].includes(input.category)) return fail("Qrup ölçüsü yanlışdır.");
 
   const room = await db.room.findUnique({ where: { id: input.roomId }, include: { library: true } });
-  if (!room || !room.isActive || !room.library.isActive) return fail("Otaq tapılmadı və ya müvəqqəti əlçatan deyil.");
+  if (!room || !room.isActive || room.archivedAt || !room.library.isActive) return fail("Otaq tapılmadı və ya müvəqqəti əlçatan deyil.");
+  if (room.underMaintenance) return fail(`Bu otaq hazırda təmirdədir${room.maintenanceNote ? ` (${room.maintenanceNote})` : ""}.`);
 
   const now = new Date();
   let start = new Date(Math.floor(input.start.getTime() / MINUTE) * MINUTE);
@@ -157,9 +160,10 @@ export async function createRoomReservation(actor: User, input: CreateRoomReserv
   const closed = await closedDaysFor(room.libraryId);
   if (!isWorkDay(day, room.library, closed)) return fail("Kitabxana həmin gün işləmir.");
   if (day > addDays(dayKey(now), rules.maxAdvanceDays)) return fail(`Ən çox ${rules.maxAdvanceDays} gün əvvəldən rezerv etmək olar.`);
-  const open = zoned(day, room.library.openMinute);
-  const close = zoned(day, room.library.closeMinute);
-  if (start < open || end > close) return fail(`Rezervasiya yalnız iş saatlarında (${fmtTime(open)}–${fmtTime(close)}) mümkündür.`);
+  const hours = roomHours(room.library);
+  const open = zoned(day, hours.openMinute);
+  const close = zoned(day, hours.closeMinute);
+  if (start < open || end > close) return fail(`Otaq rezervasiyası yalnız ${fmtTime(open)}–${fmtTime(close)} aralığında mümkündür.`);
 
   const minutes = (end.getTime() - start.getTime()) / MINUTE;
   const maxMin = maxMinutesForCategory(input.category, rules);
@@ -192,7 +196,8 @@ export async function createRoomReservation(actor: User, input: CreateRoomReserv
       }
       const guestUsers: User[] = [];
       for (const email of invitees) {
-        const g = await ensureInvitee(tx, email);
+        const g = await findInvitee(tx, email);
+        if (!g) throw new UserError(`${email} — bu e-poçtla qeydiyyatdan keçmiş tələbə tapılmadı. Dəvət olunan tələbə əvvəlcə sistemə daxil olub profilini tamamlamalıdır.`);
         if (g.blockedAt) throw new UserError(`${email} istifadəçisinin hesabı bloklanıb və dəvət edilə bilməz.`);
         guestUsers.push(g);
       }
@@ -283,6 +288,7 @@ export async function respondToInvite(actor: User, reservationId: string, accept
   if (accept) {
     const me = await db.user.findUniqueOrThrow({ where: { id: actor.id } });
     if (me.blockedAt) return fail("Hesabınız bloklanıb.");
+    if (!me.profileCompletedAt) return fail("Əvvəlcə profil məlumatlarınızı tamamlayın.");
     try {
       await serializable(async (tx) => {
         if (await userHasOverlap(tx, actor.id, r.startAt, r.endAt, r.id)) throw new UserError("Həmin vaxtda artıq başqa rezervasiyanız var.");
@@ -341,7 +347,8 @@ export async function inviteParticipant(actor: User, reservationId: string, emai
   const capacity = r.room.capacity || DEFAULT_ROOM_CAPACITY;
   const activeCount = r.participants.filter((x) => x.inviteStatus !== "DECLINED").length;
   if (activeCount >= capacity) return fail(`Otağın tutumu ${capacity} nəfərdir.`);
-  const guest = await db.$transaction(async (tx) => ensureInvitee(tx, email));
+  const guest = await db.$transaction(async (tx) => findInvitee(tx, email));
+  if (!guest) return fail(`${email} — bu e-poçtla qeydiyyatdan keçmiş tələbə tapılmadı. Dəvət olunan tələbə əvvəlcə sistemə daxil olub profilini tamamlamalıdır.`);
   if (guest.blockedAt) return fail("Bu istifadəçinin hesabı bloklanıb.");
   const existing = r.participants.find((x) => x.userId === guest.id);
   if (existing && existing.inviteStatus !== "DECLINED") return fail("Bu istifadəçi artıq dəvət olunub.");
@@ -607,7 +614,7 @@ export async function requestExtension(actor: User, reservationId: string, minut
     title: "Yeni əlavə vaxt müraciəti",
     body: `${actor.name ?? actor.email}: ${r.room.name} (${r.room.library.shortName}), +${minutes} dəq. Səbəb: ${text.slice(0, 140)}`,
     link: `/admin/muracietler`,
-  });
+  }, r.room.libraryId);
   return { ok: true };
 }
 
@@ -623,8 +630,8 @@ export async function extensionFeasibility(requestId: string): Promise<{ feasibl
   const r = q.reservation;
   if (!["BOOKED", "ACTIVE"].includes(r.status)) return { feasible: false, reason: "Rezervasiya aktiv deyil" };
   const newEnd = new Date(r.endAt.getTime() + q.minutes * MINUTE);
-  const close = zoned(dayKey(r.startAt), r.room.library.closeMinute);
-  if (newEnd > close) return { feasible: false, reason: `İş saatı ${fmtTime(close)}-da bitir`, newEnd };
+  const close = zoned(dayKey(r.startAt), roomHours(r.room.library).closeMinute);
+  if (newEnd > close) return { feasible: false, reason: `Son rezervasiya vaxtı ${fmtTime(close)}-dır`, newEnd };
   const blocks = await roomBlocks(db, r.roomId, r.endAt, newEnd, r.ownerId, r.id);
   if (blockingIntervals(blocks).length) return { feasible: false, reason: "Bu vaxtda başqa rezervasiya var", newEnd };
   return { feasible: true, newEnd };

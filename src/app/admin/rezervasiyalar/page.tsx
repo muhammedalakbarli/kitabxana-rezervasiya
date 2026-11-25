@@ -16,17 +16,18 @@ export const metadata: Metadata = { title: "Rezervasiyalar" };
 type SP = { kitabxana?: string; gun?: string; status?: string; q?: string };
 
 export default async function AdminReservations({ searchParams }: { searchParams: Promise<SP> }) {
-  await requireStaff();
+  const ctx = await requireStaff();
   await runSweep();
   const sp = await searchParams;
+  const libraryId = ctx.libraryId ?? (sp.kitabxana || null);
   const day = isValidDayKey(sp.gun) ? sp.gun : dayKey(new Date());
   const statuses = Object.keys(RESERVATION_STATUS) as ReservationStatus[];
   const status = statuses.includes(sp.status as ReservationStatus) ? (sp.status as ReservationStatus) : undefined;
-  const libraries = await db.library.findMany({ orderBy: { sortOrder: "asc" } });
+  const libraries = ctx.libraryId ? [] : await db.library.findMany({ where: { archivedAt: null }, orderBy: { sortOrder: "asc" } });
   const q = sp.q?.trim();
   const where: Prisma.ReservationWhereInput = {
     startAt: { gte: zoned(day, 0), lt: zoned(addDays(day, 1), 0) },
-    ...(sp.kitabxana ? { room: { libraryId: sp.kitabxana } } : {}),
+    ...(libraryId ? { room: { libraryId } } : {}),
     ...(status ? { status } : {}),
     ...(q ? { participants: { some: { user: { OR: [{ email: { contains: q, mode: "insensitive" } }, { name: { contains: q, mode: "insensitive" } }] } } } } : {}),
   };
@@ -36,7 +37,7 @@ export default async function AdminReservations({ searchParams }: { searchParams
     orderBy: [{ startAt: "asc" }],
     take: 300,
   });
-  const backUrl = `/admin/rezervasiyalar?gun=${day}${sp.kitabxana ? `&kitabxana=${sp.kitabxana}` : ""}${status ? `&status=${status}` : ""}`;
+  const backUrl = `/admin/rezervasiyalar?gun=${day}${!ctx.libraryId && sp.kitabxana ? `&kitabxana=${sp.kitabxana}` : ""}${status ? `&status=${status}` : ""}`;
 
   return (
     <div>
@@ -44,10 +45,12 @@ export default async function AdminReservations({ searchParams }: { searchParams
       <Card className="mb-5 p-4">
         <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1.3fr_auto]">
           <input type="date" name="gun" defaultValue={day} className="field-input" aria-label="Tarix" />
-          <select name="kitabxana" defaultValue={sp.kitabxana ?? ""} className="field-input" aria-label="Kitabxana">
-            <option value="">Bütün kitabxanalar</option>
-            {libraries.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
+          {ctx.libraryId ? <div className="field-input truncate bg-brand-50 text-brand-900/70">Seçilmiş kitabxana</div> : (
+            <select name="kitabxana" defaultValue={sp.kitabxana ?? ""} className="field-input" aria-label="Kitabxana">
+              <option value="">Bütün kitabxanalar</option>
+              {libraries.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          )}
           <select name="status" defaultValue={status ?? ""} className="field-input" aria-label="Status">
             <option value="">Bütün statuslar</option>
             {statuses.map((s) => <option key={s} value={s}>{RESERVATION_STATUS[s].label}</option>)}

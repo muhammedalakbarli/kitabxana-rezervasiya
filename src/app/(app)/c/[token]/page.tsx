@@ -68,9 +68,9 @@ export default async function CheckInPage({ params }: { params: Promise<{ token:
                   <span className="inline-flex gap-1"><XCircle className="mt-0.5 size-4 shrink-0" /> Bu otaqda hazırda sizə aid rezervasiya yoxdur və ya QR təsdiq vaxtı bitib.</span>
                 </Alert>
                 {found.freeNow ? (
-                  <LinkButton href={`/rezerv/${room.library.slug}/otaq/${room.slug}?gun=${dayKey(new Date())}`} className="w-full">Otaq hazırda boşdur — indi rezerv et</LinkButton>
+                  <LinkButton href={`/rezerv?k=${room.library.slug}&otaq=${room.slug}&gun=${dayKey(new Date())}`} className="w-full">Otaq hazırda boşdur — indi rezerv et</LinkButton>
                 ) : (
-                  <LinkButton href={`/rezerv/${room.library.slug}/otaq/${room.slug}`} variant="secondary" className="w-full">Otağın cədvəlinə bax</LinkButton>
+                  <LinkButton href={`/rezerv?k=${room.library.slug}&otaq=${room.slug}`} variant="secondary" className="w-full">Otağın cədvəlinə bax</LinkButton>
                 )}
               </>
             )}
@@ -110,7 +110,7 @@ export default async function CheckInPage({ params }: { params: Promise<{ token:
           ) : (
             <Alert tone="warning">Bu avadanlıq üçün sizə aid aktiv rezervasiya yoxdur.</Alert>
           )}
-          <LinkButton href={`/rezerv/${eq.library.slug}/avadanliq/${eq.assetTag.toLowerCase()}`} variant="secondary" className="w-full">Avadanlığın cədvəli</LinkButton>
+          <LinkButton href={`/avadanliq?k=${eq.library.slug}&item=${eq.assetTag.toLowerCase()}`} variant="secondary" className="w-full">Avadanlığın cədvəli</LinkButton>
         </div>
       </Card>
     </div>

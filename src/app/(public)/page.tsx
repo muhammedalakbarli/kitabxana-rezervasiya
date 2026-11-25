@@ -12,13 +12,13 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const [libraries, rules, laptopCount, adapterCount] = await Promise.all([
     db.library.findMany({
-      where: { isActive: true },
+      where: { isActive: true, archivedAt: null },
       orderBy: { sortOrder: "asc" },
-      include: { rooms: { where: { isActive: true }, select: { id: true } } },
+      include: { rooms: { where: { isActive: true, archivedAt: null }, select: { id: true } } },
     }),
     getRules(),
-    db.equipment.count({ where: { type: "LAPTOP", isActive: true } }),
-    db.equipment.count({ where: { type: "ADAPTER", isActive: true } }),
+    db.equipment.count({ where: { type: "LAPTOP", isActive: true, archivedAt: null } }),
+    db.equipment.count({ where: { type: "ADAPTER", isActive: true, archivedAt: null } }),
   ]);
   const roomCount = libraries.reduce((n, l) => n + l.rooms.length, 0);
 
@@ -95,7 +95,7 @@ export default async function HomePage() {
         </div>
         <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { icon: Mail, title: "Daxil olun", text: "Yalnız @qu.edu.az e-poçtu ilə. İlk girişdə fakültə, ixtisas, qrup və kurs məlumatlarınızı qeyd edin." },
+            { icon: Mail, title: "Daxil olun", text: "@qu.edu.az e-poçtu və şifrənizlə. İlk girişdə ad, soyad, fakültə, ixtisas, kurs və qrup nömrənizi qeyd edin." },
             { icon: CalendarCheck2, title: "Bina və vaxt seçin", text: "Kitabxananı seçin, otaqların boş vaxtlarını canlı görün və sizə uyğun vaxtı rezerv edin." },
             { icon: Users, title: "Dostlarınızı dəvət edin", text: "Qrup halında gəlirsinizsə, yoldaşlarınızı dəvət edin — nəfər sayına görə müddət artır." },
             { icon: QrCode, title: "QR kodu skan edin", text: `Vaxt çatanda otaqdakı QR kodu ${rules.checkInAfterMinutes} dəqiqə ərzində skan edin. Əks halda rezerv ləğv olunur.` },
@@ -149,7 +149,7 @@ export default async function HomePage() {
         </div>
         <div className="grid gap-5 md:grid-cols-2">
           {libraries.map((lib) => (
-            <Link key={lib.id} href={`/rezerv/${lib.slug}`} className="card group overflow-hidden transition hover:-translate-y-0.5 hover:shadow-lift">
+            <Link key={lib.id} href={`/rezerv?k=${lib.slug}`} className="card group overflow-hidden transition hover:-translate-y-0.5 hover:shadow-lift">
               <div className="relative h-56 overflow-hidden">
                 {lib.coverPhoto && <Image src={lib.coverPhoto} alt={lib.name} fill sizes="(min-width: 768px) 50vw, 100vw" className="object-cover transition duration-500 group-hover:scale-105" />}
                 <div className="absolute inset-0 bg-gradient-to-t from-brand-900/80 via-brand-900/10 to-transparent" />
@@ -182,7 +182,7 @@ export default async function HomePage() {
                 {laptopCount} noutbuk və {adapterCount} adapter öz identifikatorları ilə sistemdə görünür. Noutbuk {fmtDuration(rules.laptopMaxMinutes)} müddətinə yalnız oxu zalında istifadə üçün təqdim olunur
                 və başqası rezerv etməyibsə bir dəfə {rules.equipmentExtensionPercent}% uzadıla bilər.
               </p>
-              <LinkButton href="/rezerv" variant="light" className="mt-6"><Laptop className="size-4.5" /> Avadanlıq rezerv et</LinkButton>
+              <LinkButton href="/avadanliq" variant="light" className="mt-6"><Laptop className="size-4.5" /> Avadanlıq rezerv et</LinkButton>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="relative aspect-[4/3] overflow-hidden rounded-2xl ring-1 ring-white/15">

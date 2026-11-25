@@ -62,6 +62,14 @@ export function overlaps(a: Interval, b: Interval): boolean {
 }
 
 export type Hours = { openMinute: number; closeMinute: number; workDays: string };
+export type LibraryHours = Hours & { bookingStartMinute?: number | null; bookingEndMinute?: number | null };
+
+/** Otaq rezervasiyası üçün pəncərə: kitabxananın "ilk/son rezervasiya vaxtı" (yoxdursa iş saatları) */
+export function roomHours(lib: LibraryHours): Hours {
+  const open = Math.max(lib.openMinute, lib.bookingStartMinute ?? lib.openMinute);
+  const close = Math.min(lib.closeMinute, lib.bookingEndMinute ?? lib.closeMinute);
+  return { openMinute: open, closeMinute: Math.max(open, close), workDays: lib.workDays };
+}
 
 export function parseWorkDays(s: string): number[] {
   return s.split(",").map((x) => Number(x.trim())).filter((n) => n >= 1 && n <= 7);
